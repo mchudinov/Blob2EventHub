@@ -5,15 +5,13 @@ using Microsoft.Azure.Functions.Extensions.DependencyInjection;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 
 [assembly: FunctionsStartup(typeof(Blob2EventHub.Blob2EventHub))]
 namespace Blob2EventHub
 {
     public class Blob2EventHub : FunctionsStartup
-    {
-        //private static IDataReceiver _receiver;
-        //private Configuration _configuration;
+    {        
+        private static IDataReceiver _receiver;
 
         public override void Configure(IFunctionsHostBuilder builder)
         {
@@ -21,23 +19,20 @@ namespace Blob2EventHub
                 .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
                 .AddEnvironmentVariables()
                 .Build();
-            
-            var _configuration = new Configuration();
-            _configuration.EventHubName = configRoot.GetValue<string>("EventHubName");
-            _configuration.EventHubConnectionString = configRoot.GetValue<string>("EventHubConnectionString");
-            //_receiver = new EventHubReceiver(_configuration);
 
-            builder.Services.AddSingleton(_configuration);
-            builder.Services.AddSingleton<IDataReceiver, EventHubReceiver>();
+            var configuration = new Configuration();
+            configuration.EventHubName = configRoot.GetValue<string>("EventHubName");
+            configuration.EventHubConnectionString = configRoot.GetValue<string>("EventHubConnectionString");            
+            _receiver = new EventHubReceiver(configuration);
         }
 
         [FunctionName("Blob2EventHub")]
-        public async Task RunAsync([BlobTrigger("%StorageContainerName%/{filename}", Connection = "StorageConnectionString")]Stream blob, string filename, IDataReceiver receiver, ILogger log)
+        public async Task RunAsync([BlobTrigger("%StorageContainerName%/{filename}", Connection = "StorageConnectionString")]Stream blob, string filename, ILogger log)
         {
             try
             {
                 var data = blob.ReadToArray();
-                await receiver.ReceiveAsync(data);
+                await _receiver.ReceiveAsync(data);
                 log.LogTrace($"Processed blob:{filename}");
             }
             catch (Exception ex)
